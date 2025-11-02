@@ -1,0 +1,207 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weapon Inventory Management</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f4f4; }
+        .container { max-width: 900px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        h1, h2 { color: #333; }
+        .hidden { display: none; }
+        #login-form-section { margin-bottom: 20px; padding: 20px; border: 1px solid #ddd; border-radius: 5px; background-color: #e9e9e9; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input[type="text"], input[type="password"] { width: calc(100% - 22px); padding: 10px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 4px; }
+        button { background-color: #007bff; color: white; padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; }
+        button:hover { background-color: #0056b3; }
+        #login-message { color: red; margin-top: 10px; }
+        #inventory-summary, #weapons-list { margin-top: 20px; padding: 20px; border: 1px solid #ddd; border-radius: 5px; background-color: #f9f9f9; }
+        #inventory-summary p { margin: 5px 0; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Weapon Inventory Management System</h1>
+
+        <div id="login-form-section">
+            <h2>Login</h2>
+            <form id="loginForm">
+                <div>
+                    <label for="username">Username:</label>
+                    <input type="text" id="username" name="username" required value="armory">
+                </div>
+                <div>
+                    <label for="password">Password:</label>
+                    <input type="password" id="password" name="password" required value="password">
+                </div>
+                <button type="submit">Login</button>
+            </form>
+            <p id="login-message" class="hidden"></p>
+        </div>
+
+        <div id="main-content" class="hidden">
+            <div id="inventory-summary">
+                <h2>Inventory Summary</h2>
+                <p>Total Weapons: <span id="totalWeapons">Loading...</span></p>
+                <p>Issued Weapons: <span id="issuedWeapons">Loading...</span></p>
+                <p>Available Weapons: <span id="availableWeapons">Loading...</span></p>
+                <p>Under Maintenance: <span id="underMaintenanceWeapons">Loading...</span></p>
+            </div>
+
+            <div id="weapons-list">
+                <h2>Weapons List</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Weapon ID</th>
+                            <th>Serial Number</th>
+                            <th>Type</th>
+                            <th>Model</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="weaponsTableBody">
+                        <!-- Weapons will be loaded here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://127.0.0.1:5000'; // Flask app URL
+
+        const loginForm = document.getElementById('loginForm');
+        const loginMessage = document.getElementById('login-message');
+        const loginSection = document.getElementById('login-form-section');
+        const mainContent = document.getElementById('main-content');
+
+        const totalWeaponsSpan = document.getElementById('totalWeapons');
+        const issuedWeaponsSpan = document.getElementById('issuedWeapons');
+        const availableWeaponsSpan = document.getElementById('availableWeapons');
+        const underMaintenanceWeaponsSpan = document.getElementById('underMaintenanceWeapons');
+        const weaponsTableBody = document.getElementById('weaponsTableBody');
+
+        // Function to display messages
+        function showMessage(element, message, isError = true) {
+            element.textContent = message;
+            element.style.color = isError ? 'red' : 'green';
+            element.classList.remove('hidden');
+        }
+
+        // Function to hide messages
+        function hideMessage(element) {
+            element.classList.add('hidden');
+            element.textContent = '';
+        }
+
+        // --- Login Functionality ---
+        loginForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            hideMessage(loginMessage);
+
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ username, password }),
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showMessage(loginMessage, data.message, false);
+                    // Store user data if needed, e.g., localStorage.setItem('user_id', data.user_id);
+                    loginSection.classList.add('hidden');
+                    mainContent.classList.remove('hidden');
+                    fetchInventorySummary();
+                    fetchAllWeapons();
+                } else {
+                    showMessage(loginMessage, data.message);
+                }
+            } catch (error) {
+                console.error('Login error:', error);
+                showMessage(loginMessage, 'Network error. Please try again.');
+            }
+        });
+
+        // --- Inventory Summary Functionality ---
+        async function fetchInventorySummary() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/inventory_summary`);
+                const summary = await response.json();
+
+                if (response.ok) {
+                    totalWeaponsSpan.textContent = summary.TotalWeapons || 0;
+                    issuedWeaponsSpan.textContent = summary.IssuedWeapons || 0;
+                    availableWeaponsSpan.textContent = summary.AvailableWeapons || 0;
+                    underMaintenanceWeaponsSpan.textContent = summary.UnderMaintenanceWeapons || 0;
+                } else {
+                    console.error('Failed to fetch inventory summary:', summary.message);
+                    totalWeaponsSpan.textContent = 'Error';
+                    issuedWeaponsSpan.textContent = 'Error';
+                    availableWeaponsSpan.textContent = 'Error';
+                    underMaintenanceWeaponsSpan.textContent = 'Error';
+                }
+            } catch (error) {
+                console.error('Network error fetching inventory summary:', error);
+                totalWeaponsSpan.textContent = 'Error';
+                issuedWeaponsSpan.textContent = 'Error';
+                availableWeaponsSpan.textContent = 'Error';
+                underMaintenanceWeaponsSpan.textContent = 'Error';
+            }
+        }
+
+        // --- Weapons List Functionality ---
+        async function fetchAllWeapons() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/weapons`);
+                const weapons = await response.json();
+
+                if (response.ok) {
+                    weaponsTableBody.innerHTML = ''; // Clear existing rows
+                    if (weapons.length === 0) {
+                        const row = weaponsTableBody.insertRow();
+                        const cell = row.insertCell();
+                        cell.colSpan = 5;
+                        cell.textContent = 'No weapons found.';
+                        cell.style.textAlign = 'center';
+                    } else {
+                        weapons.forEach(weapon => {
+                            const row = weaponsTableBody.insertRow();
+                            row.insertCell().textContent = weapon.weapon_id;
+                            row.insertCell().textContent = weapon.serial_number;
+                            row.insertCell().textContent = weapon.type;
+                            row.insertCell().textContent = weapon.model;
+                            row.insertCell().textContent = weapon.current_status;
+                        });
+                    }
+                } else {
+                    console.error('Failed to fetch weapons list:', weapons.message);
+                    weaponsTableBody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:red;">Error loading weapons.</td></tr>`;
+                }
+            } catch (error) {
+                console.error('Network error fetching weapons list:', error);
+                weaponsTableBody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:red;">Network error loading weapons.</td></tr>`;
+            }
+        }
+
+        // Initial check if already logged in (optional, for persistent sessions)
+        // if (localStorage.getItem('user_id')) {
+        //     loginSection.classList.add('hidden');
+        //     mainContent.classList.remove('hidden');
+        //     fetchInventorySummary();
+        //     fetchAllWeapons();
+        // }
+    </script>
+</body>
+</html>
